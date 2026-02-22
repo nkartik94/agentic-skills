@@ -1,9 +1,24 @@
 ---
 name: production-python
-description: Apply production-grade Python coding conventions when writing or modifying any Python code. Use this skill for new modules, classes, functions, Pydantic models, SQLAlchemy models, tests, or project scaffolding. Enforces module structure, section markers, type hints, Google docstrings, import organization, logging, naming, formatting, error handling, architecture patterns, testing, CHANGELOG, and README conventions.
+description: Production-grade Python coding conventions for modules, classes, functions, Pydantic models, SQLAlchemy models, and tests. Use this skill when writing new Python files, modifying existing Python code, creating data models, setting up project structure, or reviewing Python code for best practices. Triggers on any task involving Python source files (.py), test files, notebooks, or project scaffolding.
+license: MIT
+metadata:
+  author: algoleap
+  version: "1.0.0"
 ---
 
-Production-grade Python coding conventions. Apply every rule below whenever writing or modifying Python code.
+# Production Python
+
+Apply every rule below whenever writing or modifying Python code.
+
+## When to Apply
+
+- Writing new Python modules, classes, or functions
+- Creating Pydantic models or SQLAlchemy ORM models
+- Setting up project structure (imports, logging, config, paths)
+- Writing or updating tests
+- Reviewing Python code for production readiness
+- Scaffolding FastAPI endpoints, repositories, or pipelines
 
 ---
 
