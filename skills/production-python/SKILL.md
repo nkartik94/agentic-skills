@@ -1,9 +1,32 @@
 ---
 name: production-python
-description: Apply production-grade Python coding conventions when writing or modifying any Python code. Use this skill for new modules, classes, functions, Pydantic models, SQLAlchemy models, or tests. Enforces module structure, section markers, type hints, Google docstrings, import organization, logging, naming, error handling, CHANGELOG, and README conventions.
+description: Apply production-grade Python coding conventions when writing or modifying any Python code. Use this skill for new modules, classes, functions, Pydantic models, SQLAlchemy models, tests, or project scaffolding. Enforces module structure, section markers, type hints, Google docstrings, import organization, logging, naming, formatting, error handling, architecture patterns, testing, CHANGELOG, and README conventions.
 ---
 
-Production-grade Python coding conventions for any project. Apply every rule below whenever writing or modifying Python code.
+Production-grade Python coding conventions. Apply every rule below whenever writing or modifying Python code.
+
+---
+
+## Quick Reference
+
+| Rule | Pattern |
+|------|---------|
+| Module header | `"""Module Name: filename.py\nDescription: ..."""` |
+| Section markers | 77-dash lines with `# SECTION: Name` |
+| End of module | `# END OF MODULE` block — always last |
+| Imports | 3 groups: stdlib / third-party / local, alphabetical |
+| Logger | `logger = setup_logger(__name__)` — never `print()` |
+| Type hints | All args + return, `Optional[X]` not `X \| None` |
+| Docstrings | Google style, class docstring on class not `__init__` |
+| Naming | `snake_case` funcs, `PascalCase` classes, `UPPER_SNAKE` constants |
+| Formatting | 100-char target, trailing commas, 2 blanks between top-level |
+| Strings | f-strings only, `pathlib.Path` for all paths |
+| Errors | Specific exceptions, `from e` chaining, log before raise |
+| Testing | `test_<func>_<scenario>`, Arrange/Act/Assert, mock all I/O |
+| Architecture | Repository pattern, centralized paths, registry for dispatch |
+| Pydantic | `ConfigDict`, `Field(description=...)`, separate Create/Response |
+| SQLAlchemy | `Mapped[T]` + `mapped_column()`, `back_populates` |
+| Package mgmt | `uv add`, `uv sync --frozen` in CI |
 
 ---
 
@@ -27,59 +50,33 @@ No author, date, or version — that belongs in version control.
 
 ## 2. Section Markers
 
-Every logical section is wrapped in 77-character dash lines. Always add a blank line before and after each marker block:
+Wrap every logical section in 77-character dash lines with blank lines before and after:
 
 ```python
 # --------------------------------------------------------------------------
 # SECTION: Imports
 # --------------------------------------------------------------------------
-
-[imports here]
-
-# --------------------------------------------------------------------------
-# SECTION: Logger Initialization
-# --------------------------------------------------------------------------
-
-logger = setup_logger(__name__)
-
-# --------------------------------------------------------------------------
-# SECTION: Constants
-# --------------------------------------------------------------------------
-
-DEFAULT_VALUE = 100
-
-# --------------------------------------------------------------------------
-# SECTION: Main Class / Functions
-# --------------------------------------------------------------------------
-
-[code here]
 ```
 
-Standard section order (include only what's needed):
-`Imports` → `Logger Initialization` → `Constants` → `Type Aliases` → [content sections]
+Standard order (include only what's needed): `Imports` -> `Logger Initialization` -> `Constants` -> `Type Aliases` -> [content sections]
 
-**Class internal sub-sections** use a shorter inline style:
+**Class sub-sections** use shorter inline markers:
 
 ```python
 class ExampleClass:
     # --- Constructor ---
     def __init__(self, param: str) -> None: ...
-
-    # --- Configuration ---
-    def _load_config(self) -> Dict: ...
-
     # --- Public API ---
     def process(self, data: List[Dict]) -> pd.DataFrame: ...
-
     # --- Private Helpers ---
     def _validate(self) -> None: ...
 ```
 
 ---
 
-## 3. End-of-Module Marker (mandatory)
+## 3. End-of-Module Marker
 
-The very last thing in every `.py` file — no code, comments, or blank lines after it:
+The very last thing in every `.py` file — no code or comments after it:
 
 ```python
 # --------------------------------------------------------------------------
@@ -89,14 +86,16 @@ The very last thing in every `.py` file — no code, comments, or blank lines af
 
 ---
 
-## 4. Import Organization — 3 groups, always
+## 4. Import Organization
+
+Three groups with comment headers, separated by blank lines:
 
 ```python
 # Standard library imports
 import logging
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Third-party imports
 import pandas as pd
@@ -108,100 +107,16 @@ from src.utils.helpers import load_prompt
 ```
 
 Rules:
-- Sort **alphabetically within each group** — bare `import X` before `from X import Y`, then alphabetical
-- Group multiple imports from the same module on one line: `from typing import Dict, List, Optional`
-- One module per line when importing different modules: separate `import logging` from `import os`
-- Absolute imports only — never `from .module import x` or `from ..utils import y`
+- Alphabetical within each group — bare `import X` before `from X import Y`
+- Group multiple from same module: `from typing import Dict, List, Optional`
+- Absolute imports only — never relative (`from .module import x`)
 - Never `import *`
-- Include all three comment headers even if only one group has entries
 
 ---
 
-## 5. Logger — Canonical `logger.py` Implementation
+## 5. Logger
 
-Every project needs a central `logger.py`. Reference implementation:
-
-```python
-"""
-Module Name: logger.py
-
-Description:
-    Centralized logging configuration.
-    Rotating file handler + console handler with noise suppression.
-"""
-
-# --------------------------------------------------------------------------
-# SECTION: Imports
-# --------------------------------------------------------------------------
-
-# Standard library imports
-import logging
-import os
-import sys
-from logging.handlers import RotatingFileHandler
-
-# --------------------------------------------------------------------------
-# SECTION: Setup Logger
-# --------------------------------------------------------------------------
-
-def setup_logger(
-    name: str,
-    log_dir: str = "logs",
-    log_file: str = "app.log",
-    max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 5,
-) -> logging.Logger:
-    """
-    Set up a logger with rotating file and console handlers.
-
-    Args:
-        name: Logger name — always pass __name__ from the calling module.
-        log_dir: Directory to write log files (created if missing).
-        log_file: Log file name.
-        max_bytes: Max file size before rotation. Default: 5 MB.
-        backup_count: Number of rotated files to retain.
-
-    Returns:
-        Configured Logger instance.
-    """
-    os.makedirs(log_dir, exist_ok=True)
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s in %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-
-    file_handler = RotatingFileHandler(
-        filename=os.path.join(log_dir, log_file),
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-
-    if not logger.handlers:
-        logger.addHandler(console_handler)
-        logger.addHandler(file_handler)
-
-    # Suppress noisy third-party library logs
-    for noisy_lib in ("urllib3", "asyncio", "langchain", "httpx", "httpcore"):
-        logging.getLogger(noisy_lib).setLevel(logging.CRITICAL)
-
-    logger.propagate = False
-    return logger
-
-# --------------------------------------------------------------------------
-# END OF MODULE
-# --------------------------------------------------------------------------
-```
-
-**In every module** — one line, immediately after the Imports section:
+Every project needs a central `logger.py` (see [references/REFERENCE.md](references/REFERENCE.md) for full implementation). In every module, one line after imports:
 
 ```python
 logger = setup_logger(__name__)
@@ -217,74 +132,42 @@ logger.error(f"Chain execution failed: {e}")
 logger.critical("Database connection lost — shutting down")
 ```
 
-Never use `print()` in production code. Always use `logger`.
+Never use `print()` in production code.
 
 ---
 
-## 6. Type Hints — Required Everywhere
+## 6. Type Hints
 
-**Simple functions:**
+Required on all function signatures — no exceptions for public APIs:
 
 ```python
 def load_prompt(file_path: str) -> str: ...
-def calculate_sum(a: int, b: int) -> int: ...
 def process(items: List[str], limit: int = 10) -> Optional[Dict[str, int]]: ...
 ```
 
-**Complex / multi-line signatures:**
+Multi-line signatures — one param per line, trailing comma:
 
 ```python
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
 def process_chunks(
     chunks: List[Dict[str, Any]],
     prompts: List[Dict[str, str]],
     run_sequentially: bool = False,
-    progress_callback: Optional[Callable] = None,
 ) -> Tuple[List[Dict[str, Any]], int, int]:
-    """
-    Returns:
-        Tuple of (results, input_token_count, output_token_count).
-    """
 ```
 
-**Optional parameters:**
-
-```python
-def get_record(
-    record_id: Optional[int] = None,
-    record_code: Optional[str] = None,
-) -> Optional[Record]: ...
-```
-
-**Class attributes** — document in the class docstring `Attributes:` section:
-
-```python
-class ProcessingPipeline:
-    """
-    Orchestrates the complete extraction workflow.
-
-    Attributes:
-        input_file_path (Path): Path to the input file.
-        model_name (str): LLM model identifier.
-        chunk_size (int): Size of data chunks for processing.
-    """
-```
+Class attributes — document in the class docstring `Attributes:` section.
 
 Rules:
-- `Optional[X]` not `X | None` (Python 3.9 compatibility)
-- `List[X]`, `Dict[K, V]`, `Tuple[X, Y]` from `typing`
+- `Optional[X]` not `X | None` (Python 3.9 compat)
+- Import `Dict`, `List`, `Tuple`, `Optional` from `typing`
 - Always annotate return type — even `-> None`
-- Common types: `Dict[str, Any]`, `List[str]`, `Tuple[int, str]`, `Callable[[int, str], bool]`
-- Use `Any` sparingly — only for truly dynamic types with no better option
+- Use `Any` sparingly
 
 ---
 
-## 7. Docstrings — Google Style on All Public APIs
+## 7. Docstrings — Google Style
 
-**Module docstring** — top of every `.py` file (see Section 1 above).
-
-**Class docstring** — on the class, never on `__init__`. Always include `Attributes:` when the class has instance state:
+**Class docstring** — on the class, never on `__init__`:
 
 ```python
 class BaseAgent:
@@ -293,12 +176,11 @@ class BaseAgent:
 
     Attributes:
         model_name (str): LLM model identifier.
-        prompt_file (str): Path to the system prompt file.
-        response_schema: Pydantic model for parsing model output.
+        response_schema: Pydantic model for parsing output.
     """
 ```
 
-**Function/method docstring:**
+**Function docstring:**
 
 ```python
 def fetch_data(source: str, timeout: int = 30) -> List[Dict]:
@@ -314,30 +196,15 @@ def fetch_data(source: str, timeout: int = 30) -> List[Dict]:
 
     Raises:
         ValueError: If source is empty or malformed.
-        TimeoutError: If the request exceeds timeout.
     """
 ```
 
-**Pydantic field descriptions** — always use `Field(description=...)`:
+Pydantic fields — always use `Field(description=...)`:
 
 ```python
-class DataRow(BaseModel):
-    """Data model for a single extracted row."""
-
-    row_index: int = Field(description="Row index in the original data as an integer.")
-    value: str = Field(description="Extracted field value from the row.")
-    confidence: float = Field(
-        description="Confidence score between 0.0 and 1.0.",
-        default=1.0,
-    )
+row_index: int = Field(description="Row index in the original data.")
+confidence: float = Field(description="Confidence score 0.0-1.0.", default=1.0)
 ```
-
-Rules:
-- Class docstring on the class, not `__init__`
-- One-liners acceptable for simple private helpers
-- Include `Args`, `Returns`, `Raises` when applicable
-- `Attributes:` format: `name (type): description`
-- Don't restate the function name in the summary line
 
 ---
 
@@ -351,46 +218,71 @@ Rules:
 | Constants | `UPPER_SNAKE_CASE` | `MAX_RETRIES`, `DEFAULT_TIMEOUT` |
 | Type aliases | `PascalCase` | `ChunkType = Dict[str, Any]` |
 
-Names must be **descriptive and unambiguous**. Avoid abbreviations except industry-standard ones (`url`, `id`, `db`, `api`). Avoid single-letter names except loop indices (`i`, `j`) and conventional math variables.
+Descriptive, unambiguous names. Avoid abbreviations except standard ones (`url`, `id`, `db`, `api`).
 
-**Class naming patterns:**
-- Agent classes: `[Domain]Agent` — `FieldAnalysisAgent`, `ProcessingAgent`
-- Manager classes: `[Domain]Manager` — `ModelManager`, `ConnectionManager`
-- Repository classes: `[Domain]Repository` — `JobRepository`, `CandidateRepository`
-- Model classes: descriptive nouns — `Client`, `ExtractionConfig`
+Class patterns: `[Domain]Agent`, `[Domain]Manager`, `[Domain]Repository`, descriptive nouns for models.
 
 ---
 
-## 9. Strings & Paths
+## 9. Formatting Standards
 
-**f-strings exclusively** — never `.format()` or `%` interpolation:
+Target line length: **100 characters** (hard limit: 120).
+
+**Blank lines:** 2 between top-level definitions, 1 between methods, 1 before/after section markers.
+
+**Long signatures** — one param per line, trailing comma:
 
 ```python
-# ✅ Good
+def process_data(
+    input_path: Path,
+    output_dir: Path,
+    chunk_size: int = 1000,
+) -> List[Dict[str, Any]]:
+```
+
+**String continuation** — parenthesized implicit concatenation:
+
+```python
+error_message = (
+    f"Failed to process file {file_path}. "
+    f"Error: {error_details}."
+)
+```
+
+**Method chains** — one call per line:
+
+```python
+result = (
+    df.query("status == 'active'")
+    .groupby("category")
+    .agg(total=("amount", "sum"))
+    .reset_index()
+)
+```
+
+**Comments:** 2 spaces before `#` for inline; block comments above code preferred.
+
+---
+
+## 10. Strings & Paths
+
+**f-strings exclusively** — never `.format()` or `%`:
+
+```python
 logger.info(f"Processing {count} records for job {job_id}")
-raise ValueError(f"Invalid status: {status!r}")
-
-# ❌ Bad
-logger.info("Processing {} records".format(count))
-logger.info("Processing %d records" % count)
 ```
 
-**`pathlib.Path` always** — never raw string concatenation:
+**`pathlib.Path` always** — never string concatenation:
 
 ```python
-# ✅ Good
 output_path = Path(base_dir) / "results" / f"{job_id}.json"
-log_file = Path("logs") / "app.log"
-
-# ❌ Bad
-output_path = base_dir + "/results/" + str(job_id) + ".json"
 ```
 
 ---
 
-## 10. Error Handling
+## 11. Error Handling
 
-Always catch specific exceptions. Never use bare `except:`. Log before raising or returning:
+Catch specific exceptions. Never bare `except:`. Log before raising:
 
 ```python
 try:
@@ -403,291 +295,273 @@ except ValueError as e:
     return None
 ```
 
-Use custom exception classes for domain-specific errors:
+**Exception chaining** — always `from e` to preserve traceback:
 
 ```python
-class ExtractionError(Exception):
-    """Raised when the extraction pipeline fails."""
+except json.JSONDecodeError as e:
+    raise ExtractionError(f"Invalid JSON in {file_path}") from e
 ```
+
+**`finally` for cleanup:**
+
+```python
+try:
+    conn = get_connection()
+    result = conn.execute(query)
+finally:
+    conn.close()
+```
+
+**Retry with Tenacity** for transient failures:
+
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=10))
+def call_llm(prompt: str) -> str:
+    """Call LLM API with automatic retry on transient failures."""
+    return client.chat(prompt).content
+```
+
+**Full traceback logging:** `logger.error(f"Failed: {e}\n{traceback.format_exc()}")`
+
+Custom exceptions for domain errors: `class ExtractionError(Exception): ...`
 
 ---
 
-## 11. Pydantic Models
+## 12. Architecture Patterns
+
+**Repository Pattern** — all DB access through repository classes:
+
+```python
+class JobRepository:
+    """Encapsulates all job-related database operations."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get_by_id(self, job_id: uuid.UUID) -> Optional[Job]:
+        return self.session.get(Job, job_id)
+
+    def create(self, **kwargs) -> Job:
+        job = Job(**kwargs)
+        self.session.add(job)
+        self.session.commit()
+        self.session.refresh(job)
+        return job
+```
+
+**Centralized Paths** — single source of truth in `config/paths.py`:
+
+```python
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+CONFIG_DIR = PROJECT_ROOT / "config"
+LOGS_DIR = PROJECT_ROOT / "logs"
+```
+
+**Registry Pattern** — extensible dispatch:
+
+```python
+PROCESSOR_REGISTRY: Dict[str, Callable] = {}
+
+def register_processor(name: str, func: Callable) -> None:
+    PROCESSOR_REGISTRY[name] = func
+
+def process(name: str, data: Dict) -> Dict:
+    return PROCESSOR_REGISTRY.get(name, process_default)(data)
+```
+
+**Configuration** — YAML in `config/`, never hardcoded values.
+
+---
+
+## 13. Testing Patterns
+
+**Naming:** `test_<module>.py` in `tests/` mirroring `src/`. Functions: `test_<func>_<scenario>`.
+
+**Structure** — Arrange / Act / Assert:
+
+```python
+def test_process_chunks_returns_expected_count() -> None:
+    """Verify process_chunks returns one result per input chunk."""
+    # Arrange
+    chunks = [{"text": "hello"}, {"text": "world"}]
+    pipeline = ProcessingPipeline(model_name="test")
+
+    # Act
+    results = pipeline.process_chunks(chunks)
+
+    # Assert
+    assert len(results) == 2
+    assert all("output" in r for r in results)
+```
+
+**Fixtures** — `@pytest.fixture` for shared setup, `conftest.py` for cross-module:
+
+```python
+@pytest.fixture
+def db_session(tmp_path: Path) -> Generator[Session, None, None]:
+    engine = create_engine(f"sqlite:///{tmp_path / 'test.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+```
+
+**Mocking** — prefer `monkeypatch` over `unittest.mock.patch`:
+
+```python
+def test_fetch_data_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(requests, "get", Mock(side_effect=Timeout))
+    assert fetch_data("https://api.example.com") is None
+```
+
+Rules: one behavior per test, `pytest.raises` for expected exceptions, mock all I/O.
+
+---
+
+## 14. Pydantic Models
+
+**Separate models for API boundaries:**
 
 ```python
 class CandidateCreate(BaseModel):
     """Request schema for creating a candidate."""
+    name: str = Field(description="Full legal name.")
+    email: str = Field(description="Primary email address.")
 
+class CandidateResponse(BaseModel):
+    """Response schema — never expose ORM objects directly."""
+    candidate_id: uuid.UUID
     name: str
-    email: str
-    skills: List[str] = []
-    experience_years: Optional[int] = None
-
-    model_config = ConfigDict(str_strip_whitespace=True)
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
 ```
 
-Rules:
-- One model per logical concept — separate request and response models
-- Use `ConfigDict` not the deprecated inner `class Config`
-- Use `Field(description="...")` on all fields
-- Response models always inherit from `BaseModel` — never expose ORM objects directly
+**Structured LLM output:**
+
+```python
+class ExtractedField(BaseModel):
+    field_name: str = Field(description="Name of the extracted field.")
+    value: str = Field(description="Extracted value.")
+    confidence: float = Field(description="Confidence score 0.0-1.0.")
+
+class ExtractionResult(BaseModel):
+    fields: List[ExtractedField]
+```
+
+Rules: `ConfigDict` (not deprecated `class Config`), `Field(description=...)` on all fields, one model per concept.
 
 ---
 
-## 12. SQLAlchemy Models (2.0 syntax)
+## 15. SQLAlchemy Models (2.0)
 
 ```python
 class Job(Base):
     """ORM model for the jobs table."""
-
     __tablename__ = "jobs"
 
-    job_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="draft")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), onupdate=func.now(), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    candidates: Mapped[List["Candidate"]] = relationship(back_populates="job")
+
+    def __repr__(self) -> str:
+        return f"Job(job_id={self.job_id!r}, title={self.title!r})"
 ```
 
 Rules:
-- Use `Mapped[T]` + `mapped_column()` syntax (SQLAlchemy 2.0) — never legacy `Column()`
-- UUID primary keys with `default=uuid.uuid4`
-- All timestamps with `timezone=True`
-- `server_default=func.now()` for DB-managed timestamps
-- No business logic in model classes — pure data containers only
-- Never use `max()` on UUID columns in queries — use `row_number()` window functions instead
+- `Mapped[T]` + `mapped_column()` — never legacy `Column()`
+- UUID primary keys, all timestamps `timezone=True`, `server_default=func.now()`
+- `back_populates` (never `backref`), `__repr__` on every model
+- No business logic in models — pure data containers
+- Never `max()` on UUID columns — use `row_number()` window functions
 
 ---
 
-## 13. Anti-Patterns — Never Do These
+## 16. Anti-Patterns
 
 ```python
-# ❌ Bare except — hides all bugs
 try: ...
-except: ...
+except: ...                        # Bare except — hides bugs
 
-# ❌ print() in production code — use logger
-print("done")
+print("done")                      # Use logger, never print()
 
-# ❌ Mutable default argument — shared state bug
-def add_item(items=[]):      # Bug: list is shared across all calls
+def add(items=[]):                 # Mutable default — shared state bug
     items.append(1)
 
-# ❌ Wildcard import — pollutes namespace, breaks tooling
-from module import *
+from module import *               # Wildcard — pollutes namespace
 
-# ❌ String path concatenation — use pathlib
-path = "/base/" + subdir + "/file.txt"
+path = "/base/" + subdir + "/f.txt"  # Use pathlib
 
-# ❌ .format() or % strings — use f-strings
-msg = "Hello %s" % name
+msg = "Hello %s" % name            # Use f-strings
 
-# ❌ Relative imports — use absolute imports
-from .utils import helper
+from .utils import helper          # Use absolute imports
 
-# ❌ Logic in __init__.py — keep it to re-exports only
-
-# ❌ God functions (> ~50 lines) — break into focused helpers
-
-# ❌ Hardcoded credentials or environment-specific values in code
-API_KEY = "sk-abc123"       # Use environment variables
+API_KEY = "sk-abc123"              # Use environment variables
 ```
+
+Also avoid: logic in `__init__.py` (re-exports only), god functions (> ~50 lines).
 
 ---
 
-## 14. Pre-Commit Checklist
-
-Before marking any Python file complete, verify:
+## 17. Pre-Commit Checklist
 
 - [ ] Module docstring with `Module Name:` and `Description:`
-- [ ] Section markers (77-dash lines) around every logical section, blank line before and after
+- [ ] Section markers (77-dash lines) around logical sections
 - [ ] `# END OF MODULE` as the very last line
-- [ ] Imports in 3 groups with comment headers, sorted alphabetically within each group
-- [ ] `logger = setup_logger(__name__)` in Logger Initialization section
-- [ ] All public functions have type hints on all args + return type
-- [ ] All public functions and classes have Google-style docstrings
-- [ ] No `print()` statements anywhere
-- [ ] No bare `except:` — always catch specific exception types
-- [ ] No mutable default arguments
-- [ ] f-strings throughout — no `.format()` or `%`
-- [ ] `pathlib.Path` for any file path operations
+- [ ] Imports in 3 groups, sorted alphabetically
+- [ ] `logger = setup_logger(__name__)` present
+- [ ] Type hints on all public function args + return
+- [ ] Google-style docstrings on public functions/classes
+- [ ] No `print()`, no bare `except:`, no mutable defaults
+- [ ] f-strings throughout, `pathlib.Path` for file paths
+- [ ] Exception chaining uses `from e`
+- [ ] Retry decorators on external API calls
+- [ ] Public functions have at least one test
+- [ ] No hardcoded paths — use `config/paths.py`
 
 ---
 
-## 15. CHANGELOG.md Format
+## 18. CHANGELOG.md
 
-Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Versioning](https://semver.org/):
+Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Versioning](https://semver.org/). Full template in [references/REFERENCE.md](references/REFERENCE.md).
 
-```markdown
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Rules: reverse chronological, `YYYY-MM-DD` dates, sections `Added`/`Changed`/`Fixed`/`Removed`/`Security` (omit empty ones). MAJOR = breaking, MINOR = features, PATCH = fixes.
 
 ---
 
-## [1.2.0] — 2026-02-22
+## 19. README.md
 
-### Added
-- New feature description (bullet points)
-- Include file paths when relevant: `path/to/module.py`
+Required sections: **Title** -> **Stack** -> **Architecture** -> **Quick Start** -> **Environment Variables** -> **Development** -> **Project Structure** -> **Docs**
 
-### Changed
-- Modifications to existing features; mark breaking changes clearly
-
-### Fixed
-- Bug fixes with enough context to understand the change
-
-### Removed
-- Previously deprecated features now gone
-
-### Security
-- Security updates; include CVE numbers when applicable
-```
-
-Rules:
-- **Reverse chronological order** — newest release at top
-- Dates always `YYYY-MM-DD` (ISO 8601)
-- Only include sections that have content — omit empty `### Added` headings
-- Semantic versioning:
-  - MAJOR: breaking changes
-  - MINOR: new backwards-compatible features
-  - PATCH: backwards-compatible bug fixes
+Full template in [references/REFERENCE.md](references/REFERENCE.md). Start broad (what + why), get specific (how). Quick Start < 5 steps.
 
 ---
 
-## 16. README.md Structure
+## 20. Jupyter Notebooks
 
-Required sections in this order:
-
-```markdown
-# Project Title
-
-One-sentence description of what the project does.
+Notebooks in `notebooks/`, `snake_case` names (no dates). Cell order: title -> imports -> config -> processing -> results. Use `setup_logger(__name__)`. Clear outputs before committing. Full conventions in [references/REFERENCE.md](references/REFERENCE.md).
 
 ---
 
-## Stack
-
-| Layer | Technology |
-|-------|------------|
-| Backend | Python 3.12 · FastAPI |
-
----
-
-## Architecture
-
-Brief overview of key flows or design decisions (3–5 sentences or a diagram).
-
----
-
-## Quick Start
-
-### Prerequisites
-- Requirement 1
-
-### Setup
-​```bash
-# Numbered commands — keep it genuinely quick (< 5 steps to running state)
-​```
-
----
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-
----
-
-## Development
-
-Hot reload notes, migration commands, test commands.
-
----
-
-## Project Structure
-
-​```
-project/
-├── src/         # Source code
-├── tests/       # Tests
-└── docs/        # Documentation
-​```
-
----
-
-## Docs
-
-- [Architecture](docs/architecture.md)
-- [Style Guide](docs/coding_style_guide.md)
-```
-
-Principles:
-- Start broad (what + why), get specific (how)
-- Features and architecture before implementation details
-- Link to detailed docs — don't duplicate content in README
-- Quick Start must be genuinely quick
-
----
-
-## 17. Jupyter Notebooks
-
-- All notebooks live in `notebooks/` organized by purpose
-- File naming: `snake_case`, descriptive, **no dates** in filename — use git history
-  - Good: `extraction_analysis.ipynb`, `db_setup.ipynb`
-  - Bad: `analysis_2026_02_22.ipynb`
-- Standard structure:
-  1. Markdown title cell — state the notebook's purpose
-  2. Imports cell — same 3-group import pattern as `.py` files
-  3. Configuration cell — paths, constants, flags
-  4. Processing cells
-  5. Results / visualization cells
-- Use `setup_logger(__name__)` in notebooks the same as in `.py` files
-- Clear large outputs before committing (avoid bloating the repo)
-
----
-
-## 18. Package Management with `uv`
-
-Use `uv` for all Python dependency management — 10–100× faster than pip:
+## 21. Package Management with `uv`
 
 ```bash
-# Add dependency — auto-updates pyproject.toml + uv.lock
-uv add fastapi
-uv add pandas==2.2.3         # Pin exact version for production
-
-# Add dev dependency
-uv add --dev pytest ruff black
-
-# Install from lock file (reproducible)
-uv sync
-
-# CI/CD — production only, never modifies the lock file
-uv sync --no-dev --frozen
-
-# Update dependencies
-uv lock --upgrade && uv sync
+uv add fastapi                    # Add dependency
+uv add pandas==2.2.3              # Pin exact version for production
+uv add --dev pytest ruff black    # Dev dependency
+uv sync                           # Install from lock file
+uv sync --no-dev --frozen         # CI/CD — production only
 ```
 
-`pyproject.toml` key rules:
-- Pin exact versions in production: `"fastapi==0.115.12"`
-- Always commit both `pyproject.toml` **and** `uv.lock`
-- Dev tools go under `[project.optional-dependencies]`
+Rules: pin exact versions in production, commit both `pyproject.toml` and `uv.lock`, dev tools under `[project.optional-dependencies]`.
 
-Dockerfile pattern with `uv`:
+Dockerfile: `COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv` then `uv sync --system --no-dev --frozen`.
 
-```dockerfile
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY pyproject.toml uv.lock ./
-RUN uv sync --system --no-dev --frozen
-COPY . .
-```
+---
+
+For full templates, complete code examples, and additional resources, see [references/REFERENCE.md](references/REFERENCE.md).

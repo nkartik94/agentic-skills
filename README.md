@@ -24,7 +24,7 @@ npx skills add nkartik94/agentic-skills --skill production-python
 
 | Skill | Description |
 |-------|-------------|
-| [production-python](skills/production-python/) | Production-grade Python coding conventions — module structure, section markers, type hints, Google docstrings, logging, naming, error handling, Pydantic, SQLAlchemy, CHANGELOG, README, and more |
+| [production-python](skills/production-python/) | Production-grade Python coding conventions — module structure, type hints, docstrings, logging, naming, formatting, error handling, architecture patterns, testing, Pydantic, SQLAlchemy, CHANGELOG, README, and more |
 
 ---
 
