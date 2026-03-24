@@ -4,7 +4,7 @@ description: Production-grade Python coding conventions for modules, classes, fu
 license: MIT
 metadata:
   author: algoleap
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Production Python
@@ -34,7 +34,7 @@ Apply every rule below whenever writing or modifying Python code.
 | Type hints | All args + return, `Optional[X]` not `X \| None` |
 | Docstrings | Google style, class docstring on class not `__init__` |
 | Naming | `snake_case` funcs, `PascalCase` classes, `UPPER_SNAKE` constants |
-| Formatting | 100-char target, trailing commas, 2 blanks between top-level |
+| Formatting | 88-char target (Black/Ruff default), trailing commas, 2 blanks between top-level |
 | Strings | f-strings only, `pathlib.Path` for all paths |
 | Errors | Specific exceptions, `from e` chaining, log before raise |
 | Testing | `test_<func>_<scenario>`, Arrange/Act/Assert, mock all I/O |
@@ -124,7 +124,7 @@ from src.utils.helpers import load_prompt
 Rules:
 - Alphabetical within each group — bare `import X` before `from X import Y`
 - Group multiple from same module: `from typing import Dict, List, Optional`
-- Absolute imports only — never relative (`from .module import x`)
+- Absolute imports only — never relative (`from .module import x`), **except** `__init__.py` re-exports where relative imports are acceptable per PEP 8
 - Never `import *`
 
 ---
@@ -148,6 +148,12 @@ logger.critical("Database connection lost — shutting down")
 ```
 
 Never use `print()` in production code.
+
+**Exception:** `%`-style formatting is acceptable in `logger.*()` calls (lazy string evaluation — skips construction if the message is filtered):
+
+```python
+logger.info("Processed %d records in %.2fs", count, elapsed)
+```
 
 ---
 
@@ -241,7 +247,7 @@ Class patterns: `[Domain]Agent`, `[Domain]Manager`, `[Domain]Repository`, descri
 
 ## 9. Formatting Standards
 
-Target line length: **100 characters** (hard limit: 120).
+Target line length: **88 characters** (Black/Ruff default). Hard limit: 100.
 
 **Blank lines:** 2 between top-level definitions, 1 between methods, 1 before/after section markers.
 
@@ -276,6 +282,8 @@ result = (
 ```
 
 **Comments:** 2 spaces before `#` for inline; block comments above code preferred.
+
+**Trailing newline:** Every file ends with exactly one newline character. Enable in VSCode: `"files.insertFinalNewline": true`. Ruff auto-fixes `W292`.
 
 ---
 
@@ -392,7 +400,150 @@ def process(name: str, data: Dict) -> Dict:
 
 ---
 
-## 13. Testing Patterns
+## 13. Environment Variables
+
+Use `pydantic-settings` to load and validate all configuration from environment variables:
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    database_url: str
+    api_key: str
+    debug: bool = False
+    max_workers: int = 4
+
+settings = Settings()
+```
+
+Rules:
+- Never hardcode secrets or environment-specific values — use env vars
+- Provide a `.env.example` with all required keys (no real values)
+- Validate at startup so missing config fails fast, not at runtime
+- Import the singleton `settings` object, never call `os.getenv()` in business logic
+
+Full implementation in [references/REFERENCE.md](references/REFERENCE.md).
+
+---
+
+## 14. Async Patterns
+
+Use `async def` / `await` for I/O-bound work (HTTP, DB, file I/O). Never block the event loop with synchronous calls:
+
+```python
+import asyncio
+from typing import List
+
+async def fetch_all(urls: List[str]) -> List[str]:
+    """Fetch multiple URLs concurrently."""
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_one(session, url) for url in urls]
+        return await asyncio.gather(*tasks)
+
+async def fetch_one(session: aiohttp.ClientSession, url: str) -> str:
+    """Fetch a single URL."""
+    async with session.get(url) as response:
+        return await response.text()
+```
+
+Rules:
+- `async def` for any function that calls `await` — never mix sync/async carelessly
+- Use `asyncio.gather()` for concurrent independent tasks
+- Use `asyncio.run()` at the entry point — never `loop.run_until_complete()`
+- Wrap sync blocking calls with `asyncio.to_thread()` if unavoidable
+- Same logging, type hints, docstring, and error handling rules apply
+
+---
+
+## 15. TypedDict & Protocol
+
+**`TypedDict`** — typed dict shape without Pydantic overhead (no validation, pure annotation):
+
+```python
+from typing import TypedDict
+
+class JobConfig(TypedDict):
+    model_name: str
+    chunk_size: int
+    dry_run: bool
+```
+
+**`Protocol`** — structural typing (duck typing with type safety):
+
+```python
+from typing import Protocol
+
+class Runnable(Protocol):
+    def run(self, data: dict) -> dict: ...
+    def validate(self) -> bool: ...
+
+def execute(runner: Runnable) -> dict:
+    """Accepts any object implementing Runnable — no inheritance required."""
+    if not runner.validate():
+        raise ValueError("Validation failed")
+    return runner.run({})
+```
+
+Use `TypedDict` over plain `Dict[str, Any]` when the shape is known. Use `Protocol` over `ABC` when you want structural typing without forcing inheritance.
+
+---
+
+## 16. Canonical Log Lines
+
+For API endpoints and pipeline runs, emit **one structured summary line** at operation end that collates all key telemetry:
+
+```python
+import json
+import time
+from typing import Any, Dict
+
+class CanonicalLog:
+    """Accumulates fields and emits one structured log line per operation."""
+
+    def __init__(self) -> None:
+        self._fields: Dict[str, Any] = {}
+        self._start = time.monotonic()
+
+    def set(self, **kwargs: Any) -> None:
+        """Add or update fields."""
+        self._fields.update(kwargs)
+
+    def emit(self, logger) -> None:
+        """Emit the canonical line with auto-computed duration."""
+        self._fields["duration_ms"] = round((time.monotonic() - self._start) * 1000)
+        logger.info("CANONICAL %s", json.dumps(self._fields))
+```
+
+**Usage pattern — always emit in `finally`:**
+
+```python
+def handle_request(request):
+    log = CanonicalLog()
+    log.set(event="extraction.run", path=request.url.path)
+    try:
+        result = run_extraction(request)
+        log.set(status="success", rows=len(result), tokens_in=result.input_tokens)
+        return result
+    except Exception as e:
+        log.set(status="error", error=str(e))
+        raise
+    finally:
+        log.emit(logger)  # Always fires — even on exception
+```
+
+**Output:**
+```
+CANONICAL {"event": "extraction.run", "path": "/extract", "status": "success", "rows": 42, "duration_ms": 820}
+```
+
+Full implementation with request ID correlation and JSON logging mode in [references/REFERENCE.md](references/REFERENCE.md).
+
+---
+
+## 17. Testing Patterns
 
 **Naming:** `test_<module>.py` in `tests/` mirroring `src/`. Functions: `test_<func>_<scenario>`.
 
@@ -436,7 +587,7 @@ Rules: one behavior per test, `pytest.raises` for expected exceptions, mock all 
 
 ---
 
-## 14. Pydantic Models
+## 18. Pydantic Models
 
 **Separate models for API boundaries:**
 
@@ -470,7 +621,7 @@ Rules: `ConfigDict` (not deprecated `class Config`), `Field(description=...)` on
 
 ---
 
-## 15. SQLAlchemy Models (2.0)
+## 19. SQLAlchemy Models (2.0)
 
 ```python
 class Job(Base):
@@ -497,7 +648,7 @@ Rules:
 
 ---
 
-## 16. Anti-Patterns
+## 20. Anti-Patterns
 
 ```python
 try: ...
@@ -523,7 +674,7 @@ Also avoid: logic in `__init__.py` (re-exports only), god functions (> ~50 lines
 
 ---
 
-## 17. Pre-Commit Checklist
+## 21. Pre-Commit Checklist
 
 - [ ] Module docstring with `Module Name:` and `Description:`
 - [ ] Section markers (77-dash lines) around logical sections
@@ -534,6 +685,7 @@ Also avoid: logic in `__init__.py` (re-exports only), god functions (> ~50 lines
 - [ ] Google-style docstrings on public functions/classes
 - [ ] No `print()`, no bare `except:`, no mutable defaults
 - [ ] f-strings throughout, `pathlib.Path` for file paths
+- [ ] File ends with exactly one trailing newline
 - [ ] Exception chaining uses `from e`
 - [ ] Retry decorators on external API calls
 - [ ] Public functions have at least one test
@@ -541,7 +693,7 @@ Also avoid: logic in `__init__.py` (re-exports only), god functions (> ~50 lines
 
 ---
 
-## 18. CHANGELOG.md
+## 22. CHANGELOG.md
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Versioning](https://semver.org/). Full template in [references/REFERENCE.md](references/REFERENCE.md).
 
@@ -549,7 +701,7 @@ Rules: reverse chronological, `YYYY-MM-DD` dates, sections `Added`/`Changed`/`Fi
 
 ---
 
-## 19. README.md
+## 23. README.md
 
 Required sections: **Title** -> **Stack** -> **Architecture** -> **Quick Start** -> **Environment Variables** -> **Development** -> **Project Structure** -> **Docs**
 
@@ -557,13 +709,13 @@ Full template in [references/REFERENCE.md](references/REFERENCE.md). Start broad
 
 ---
 
-## 20. Jupyter Notebooks
+## 24. Jupyter Notebooks
 
 Notebooks in `notebooks/`, `snake_case` names (no dates). Cell order: title -> imports -> config -> processing -> results. Use `setup_logger(__name__)`. Clear outputs before committing. Full conventions in [references/REFERENCE.md](references/REFERENCE.md).
 
 ---
 
-## 21. Package Management with `uv`
+## 25. Package Management with `uv`
 
 ```bash
 uv add fastapi                    # Add dependency
@@ -579,4 +731,4 @@ Dockerfile: `COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv` then
 
 ---
 
-For full templates, complete code examples, and additional resources, see [references/REFERENCE.md](references/REFERENCE.md).
+For full templates, complete code examples, env var setup, async patterns, canonical logging implementation, and additional resources, see [references/REFERENCE.md](references/REFERENCE.md).
