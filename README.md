@@ -12,11 +12,13 @@ npx skills add nkartik94/agentic-skills
 
 Or install a specific skill:
 
+**Python coding conventions:**
 ```bash
-# Python coding conventions
 npx skills add nkartik94/agentic-skills --skill production-python
+```
 
-# Git workflow and branching strategy
+**Git workflow and branching strategy:**
+```bash
 npx skills add nkartik94/agentic-skills --skill production-git
 ```
 
