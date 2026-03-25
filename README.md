@@ -22,7 +22,8 @@ Skills activate automatically when the agent detects a relevant task — no manu
 
 | Skill | Description | Highlights |
 |-------|-------------|------------|
-| [production-python](skills/production-python/) | Production-grade Python coding conventions | 21 rules covering module structure, type hints, docstrings, logging, formatting, error handling, architecture patterns, testing, Pydantic, SQLAlchemy, and more |
+| [production-python](skills/production-python/) | Production-grade Python coding conventions | 25 rules covering module structure, type hints, docstrings, logging, formatting, error handling, architecture patterns, async, testing, Pydantic, SQLAlchemy, and more |
+| [production-git](skills/production-git/) | Git branching strategy, commit conventions, PR workflow, and release management | 10 rules covering branch naming, Conventional Commits, PR/release/hotfix/rollback procedures, semver tagging, and anti-patterns |
 
 ## How Skills Work
 
