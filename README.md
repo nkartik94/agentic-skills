@@ -22,6 +22,11 @@ npx skills add nkartik94/agentic-skills --skill production-python
 npx skills add nkartik94/agentic-skills --skill production-git
 ```
 
+**React coding conventions:**
+```bash
+npx skills add nkartik94/agentic-skills --skill production-react
+```
+
 Skills activate automatically when the agent detects a relevant task — no manual triggering needed.
 
 ## Update
@@ -37,14 +42,16 @@ Or update a specific skill:
 ```bash
 npx skills update --skill production-python
 npx skills update --skill production-git
+npx skills update --skill production-react
 ```
 
 ## Available Skills
 
 | Skill | Description | Highlights |
 |-------|-------------|------------|
-| [production-python](skills/production-python/) | Production-grade Python coding conventions | 25 rules covering module structure, type hints, docstrings, logging, formatting, error handling, architecture patterns, async, testing, Pydantic, SQLAlchemy, and more |
+| [production-python](skills/production-python/) | Production-grade Python coding conventions | 27 rules covering module structure, type hints, docstrings, logging, formatting, error handling, architecture patterns, async, testing, Pydantic, SQLAlchemy, Docker, uv, and more |
 | [production-git](skills/production-git/) | Git branching strategy, commit conventions, PR workflow, and release management | 10 rules covering branch naming, Conventional Commits, PR/release/hotfix/rollback procedures, semver tagging, and anti-patterns |
+| [production-react](skills/production-react/) | Production-grade React coding conventions with TypeScript | 20 rules covering project structure, TypeScript props, hooks, state management, TanStack Query, forms, testing, accessibility, performance, and tooling |
 
 ## How Skills Work
 
