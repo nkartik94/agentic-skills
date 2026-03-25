@@ -3,7 +3,7 @@ name: production-git
 description: Git branching strategy, commit conventions, PR workflow, release management, hotfix procedures, rollback, and tagging for production software projects. Use this skill when creating branches, writing commit messages, opening pull requests, preparing releases, handling production incidents, or reviewing git history and workflow. Triggers on any git-related task: branching, committing, merging, tagging, or deployment workflow.
 license: MIT
 metadata:
-  author: algoleap
+  author: nkartik94
   version: "1.0.0"
 ---
 
@@ -102,11 +102,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Multi-line Format (for complex changes)
 
 ```
-feat: add aviation SOV type support
+feat: add csv file format support
 
-- Add new prompt directory for aviation extraction
-- Register aviation processor in the registry
-- Update SOV type configuration YAML
+- Add new parser for CSV input files
+- Register csv processor in the file type registry
+- Update file type configuration YAML
 
 Closes #42
 ```
@@ -364,6 +364,7 @@ Rules:
 | Vague branch names (`fix/bug`, `feat/new`) | Nobody knows what it is | Describe the actual change in 3–5 words |
 | Multiple local copies instead of branches | No history, no diff, fragile | Git branches serve exactly this purpose |
 | `git commit -m "wip"` as final commit | Meaningless history | Squash messy commits before PR, write a proper message |
+| `Co-Authored-By: <LLM name>` in commits | LLMs are tools, not contributors — clutters history and misrepresents authorship | Omit entirely; you wrote the code, you own the commit |
 
 ---
 
