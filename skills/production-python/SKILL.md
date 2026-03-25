@@ -4,7 +4,7 @@ description: Production-grade Python coding conventions for modules, classes, fu
 license: MIT
 metadata:
   author: nkartik94
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Production Python
@@ -676,28 +676,71 @@ Also avoid: logic in `__init__.py` (re-exports only), god functions (> ~50 lines
 
 ## 21. Pre-Commit Checklist
 
+### Structure & Organization
 - [ ] Module docstring with `Module Name:` and `Description:`
 - [ ] Section markers (77-dash lines) around logical sections
 - [ ] `# END OF MODULE` as the very last line
 - [ ] Imports in 3 groups, sorted alphabetically
 - [ ] `logger = setup_logger(__name__)` present
-- [ ] Type hints on all public function args + return
-- [ ] Google-style docstrings on public functions/classes
+- [ ] Blank lines follow PEP 8 (2 between top-level, 1 between methods)
+
+### Documentation
+- [ ] Google-style docstrings on all public functions and classes
+- [ ] Class docstrings include an `Attributes:` section
+- [ ] Function docstrings include `Args:`, `Returns:`, and `Raises:` where applicable
+- [ ] Complex logic has explanatory inline comments
+- [ ] Class subsection headers (`# --- Public API ---` etc.) present in non-trivial classes
+
+### Naming & Types
+- [ ] Variables and functions use `snake_case`; private helpers prefixed with `_`
+- [ ] Classes use `PascalCase`, constants use `UPPER_SNAKE_CASE`
+- [ ] Type hints on all public function args + return values
+- [ ] Type hint imports come from `typing` (e.g. `List`, `Optional`, `Dict`)
+
+### Code Quality
 - [ ] No `print()`, no bare `except:`, no mutable defaults
-- [ ] f-strings throughout, `pathlib.Path` for file paths
+- [ ] Specific exception types in all `try/except` blocks; `from e` chaining
+- [ ] Logging at appropriate levels (`debug`/`info`/`warning`/`error`)
+- [ ] Input validation with descriptive error messages at entry points
+- [ ] f-strings throughout, `pathlib.Path` for all file paths
+- [ ] No relative imports (use `from src.` absolute paths; `__init__.py` re-exports are the only exception)
 - [ ] File ends with exactly one trailing newline
-- [ ] Exception chaining uses `from e`
-- [ ] Retry decorators on external API calls
+
+### Patterns & Conventions
+- [ ] Default parameters use module-level constants, not magic literals
+- [ ] No hardcoded paths — use `config/paths.py` or `pathlib.Path` constants
+- [ ] Retry decorators on external API / DB calls
+- [ ] Repository pattern for all database access (if applicable)
+- [ ] Pydantic models for all API request/response schemas (if applicable)
+
+### Testing & Verification
 - [ ] Public functions have at least one test
-- [ ] No hardcoded paths — use `config/paths.py`
+- [ ] No unresolved `TODO` or `FIXME` comments
+- [ ] Line length within 88 chars
 
 ---
 
 ## 22. CHANGELOG.md
 
-Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Versioning](https://semver.org/). Full template in [references/REFERENCE.md](references/REFERENCE.md).
+Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Versioning](https://semver.org/). Full template and example in [references/REFERENCE.md](references/REFERENCE.md).
 
-Rules: reverse chronological, `YYYY-MM-DD` dates, sections `Added`/`Changed`/`Fixed`/`Removed`/`Security` (omit empty ones). MAJOR = breaking, MINOR = features, PATCH = fixes.
+Rules: reverse chronological, `YYYY-MM-DD` dates, omit empty sections. MAJOR = breaking, MINOR = features, PATCH = fixes.
+
+Each release entry uses this structure:
+- `## [VERSION] — YYYY-MM-DD` heading
+- 1–2 sentence **summary paragraph** (plain English, what changed and why)
+- Sections: `Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`
+
+| Section | Use for |
+|---------|---------|
+| **Added** | New features and capabilities |
+| **Changed** | Modifications to existing features; mark breaking changes |
+| **Deprecated** | Features marked for future removal; include migration guidance |
+| **Removed** | Previously deprecated features now gone |
+| **Fixed** | Bug fixes |
+| **Security** | Vulnerabilities patched; include CVE numbers when applicable |
+
+Best practices: mention file paths and function names in entries, explain *why* not just *what*, link to issues/PRs.
 
 ---
 
@@ -718,16 +761,81 @@ Notebooks in `notebooks/`, `snake_case` names (no dates). Cell order: title -> i
 ## 25. Package Management with `uv`
 
 ```bash
+uv init                           # Initialize new project
 uv add fastapi                    # Add dependency
 uv add pandas==2.2.3              # Pin exact version for production
 uv add --dev pytest ruff black    # Dev dependency
+uv remove old-package             # Remove dependency
 uv sync                           # Install from lock file
-uv sync --no-dev --frozen         # CI/CD — production only
+uv sync --dev                     # Install including dev deps
+uv sync --no-dev --frozen         # CI/CD — production only, no lock update
+uv lock --upgrade                 # Update all packages to latest compatible
+uv lock --upgrade-package fastapi # Update single package
+uv run pytest                     # Run command in project environment
 ```
 
 Rules: pin exact versions in production, commit both `pyproject.toml` and `uv.lock`, dev tools under `[project.optional-dependencies]`.
 
-Dockerfile: `COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv` then `uv sync --system --no-dev --frozen`.
+Full guide — pyproject.toml structure, Docker workflow, CI/CD GitHub Actions snippet, and uv vs pip comparison: [references/REFERENCE.md](references/REFERENCE.md).
+
+---
+
+## 26. Docker
+
+Dockerfiles follow the same section-marker convention as Python modules — wrap each logical block in labeled sections:
+
+```dockerfile
+# SECTION: Base Image
+FROM python:3.12.11-slim
+
+# SECTION: Python Dependencies Installation
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY pyproject.toml uv.lock ./
+ENV UV_PROJECT_ENVIRONMENT="/usr/local"
+RUN uv sync --no-dev --frozen
+
+# SECTION: Application Code
+COPY . .
+```
+
+Key pattern: install uv from its official image, set `UV_PROJECT_ENVIRONMENT` to install into system Python (no `.venv` in containers), then `uv sync --no-dev --frozen` for reproducible production installs.
+
+Full Dockerfile template and Docker command reference (build, run, compose, debug): [references/REFERENCE.md](references/REFERENCE.md).
+
+---
+
+## 27. Common Patterns
+
+### Optional progress callback
+
+Accept an optional callback to report progress — lets callers wire in a UI (Streamlit, CLI progress bar) without coupling the function to any framework:
+
+```python
+from typing import Callable, Optional
+
+def process_items(
+    items: List[Any],
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+) -> List[Any]:
+    for i, item in enumerate(items):
+        result = process_single(item)
+        if progress_callback:
+            progress_callback(i + 1, len(items))  # (completed, total)
+    return results
+```
+
+### Dynamic parameter dispatch with `inspect.signature`
+
+When calling functions from a registry where different implementations accept different parameters, use `inspect.signature` to build kwargs dynamically rather than a chain of `if` checks:
+
+```python
+import inspect
+
+def dispatch(func: Callable, available: Dict[str, Any]) -> Any:
+    sig = inspect.signature(func)
+    kwargs = {k: available[k] for k in sig.parameters if k in available}
+    return func(**kwargs)
+```
 
 ---
 

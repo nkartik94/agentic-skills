@@ -513,6 +513,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] — 2026-02-22
 
+Brief 1–2 sentence summary of what changed and why in this release.
+
 ### Added
 - New feature description (bullet points)
 - Include file paths when relevant: `path/to/module.py`
@@ -520,14 +522,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Modifications to existing features; mark breaking changes clearly
 
-### Fixed
-- Bug fixes with enough context to understand the change
+### Deprecated
+- Features marked for future removal; include migration guidance
 
 ### Removed
 - Previously deprecated features now gone
 
+### Fixed
+- Bug fixes with enough context to understand the change
+
 ### Security
 - Security updates; include CVE numbers when applicable
+```
+
+**Rules:**
+- Reverse chronological order — newest version at the top
+- `YYYY-MM-DD` date format (ISO 8601)
+- Omit empty sections (don't add `### Added` with no content)
+- Each version entry starts with a 1–2 sentence plain-English summary paragraph
+
+**When to use each section:**
+
+| Section | Use for | Example |
+|---------|---------|---------|
+| **Added** | New features and capabilities | "Added CSV export endpoint" |
+| **Changed** | Modifications to existing features | "Sheet identification now uses full preprocessing pipeline" |
+| **Deprecated** | Marked for future removal | "Legacy V1 endpoints deprecated; use V2 equivalents" |
+| **Removed** | Previously deprecated, now gone | "Removed `POST /extract` V1 endpoint" |
+| **Fixed** | Bug fixes | "Fixed Pydantic namespace warnings in model schemas" |
+| **Security** | Vulnerabilities patched | "Patched SQL injection in search query builder (CVE-2026-XXXX)" |
+
+**Best practices:**
+- Be specific: mention file paths, function names, and parameter names
+- Explain *why*, not just *what* — reviewers need context
+- Include migration guidance for breaking changes
+- Link to issues or PRs where relevant
+
+**Complete example:**
+
+```markdown
+## [0.12.0] — 2026-02-09
+
+Adds cell reference tracking to the extraction pipeline and removes legacy V1
+endpoints that were deprecated in v0.10.0.
+
+### Added
+- **Cell Reference Tracking** for extraction pipeline
+  - Adds `{field}_source_cell` columns showing exact source cell references
+  - New module: `src/core/utils/cell_reference_tracker.py`
+  - New parameter `enable_cell_tracking: bool = True` in `run_extraction()`
+  - Can be disabled by passing `enable_cell_tracking=False`
+
+### Fixed
+- **Pydantic `model_` namespace warnings** in API schemas
+  - Added `protected_namespaces=()` to `ConfigDict` in `apps/api/schemas/model_schemas.py`
+
+### Removed
+- **Legacy V1 pipeline endpoints** (deprecated since v0.10.0)
+  - `GET /models` — hardcoded enum, superseded by dynamic model list
+  - `POST /extract` — V1 extraction endpoint, use `POST /v2/extract`
 ```
 
 ---
@@ -752,6 +805,222 @@ class OrderProcessor:
 
 ---
 
+## Docker Configuration
+
+### Dockerfile Template
+
+```dockerfile
+# -----------------------------------------------------------------------------
+# Dockerfile for [Application Name]
+#
+# Description:
+# Brief description of what this container runs and exposes.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# SECTION: Base Image
+# -----------------------------------------------------------------------------
+FROM python:3.12.11-slim
+
+# -----------------------------------------------------------------------------
+# SECTION: Working Directory Setup
+# -----------------------------------------------------------------------------
+WORKDIR /app
+
+# -----------------------------------------------------------------------------
+# SECTION: System Dependencies
+# -----------------------------------------------------------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends supervisor && \
+    rm -rf /var/lib/apt/lists/*
+
+# -----------------------------------------------------------------------------
+# SECTION: Python Dependencies
+# -----------------------------------------------------------------------------
+# Install uv from its official image (fast, no pip/Poetry needed)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+COPY pyproject.toml uv.lock ./
+
+# Install into system Python — no .venv in containers (Docker provides isolation)
+ENV UV_PROJECT_ENVIRONMENT="/usr/local"
+
+RUN uv sync --no-dev --frozen
+
+# -----------------------------------------------------------------------------
+# SECTION: Application Code & Configuration
+# -----------------------------------------------------------------------------
+COPY . .
+
+# -----------------------------------------------------------------------------
+# SECTION: Port Exposure
+# -----------------------------------------------------------------------------
+EXPOSE 8000
+
+# -----------------------------------------------------------------------------
+# SECTION: Entrypoint
+# -----------------------------------------------------------------------------
+CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Docker Command Reference
+
+**Build & run:**
+```bash
+docker build -t image_name .
+docker run -p 8000:8000 image_name
+docker compose build
+docker compose up
+docker compose up -d          # Detached mode
+docker compose up --build     # Rebuild and start
+docker compose down
+```
+
+**Container management:**
+```bash
+docker ps                     # Running containers
+docker ps -a                  # All containers
+docker stop <id>
+docker stop $(docker ps -aq)  # Stop all
+docker rm -f $(docker ps -aq) # Remove all
+```
+
+**Image management:**
+```bash
+docker images
+docker rmi <id>
+docker rmi -f $(docker images -aq)  # Remove all
+docker save -o image.tar image_name
+docker load -i image.tar
+```
+
+**Debugging:**
+```bash
+docker logs <id>
+docker logs -f <id>           # Follow mode
+docker exec -it <id> /bin/bash
+docker stats <id>
+docker top <id>
+docker compose logs -f service_name
+```
+
+---
+
+## uv — Full Guide
+
+### Installation
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # Recommended
+pip install uv                                       # Via pip
+```
+
+### pyproject.toml Structure
+
+```toml
+[project]
+name = "your-project"
+version = "0.1.0"
+description = "Project description"
+requires-python = ">=3.12"
+
+# Pin exact versions for reproducibility in production
+dependencies = [
+    "fastapi==0.115.12",
+    "sqlalchemy==2.0.36",
+    "pydantic==2.11.1",
+    "pydantic-settings==2.8.1",
+    "uvicorn==0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.9.0",
+    "black>=25.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+```
+
+### Command Reference
+
+```bash
+# Project setup
+uv init                            # Initialize new project
+uv venv                            # Create virtual environment
+
+# Dependencies
+uv add fastapi                     # Add production dependency
+uv add pandas==2.2.3               # Pin exact version
+uv add --dev pytest ruff black     # Add dev dependency
+uv remove old-package              # Remove dependency
+
+# Installing
+uv sync                            # Install all deps from uv.lock
+uv sync --dev                      # Include dev dependencies
+uv sync --no-dev --frozen          # CI/production — no lock update
+
+# Updating
+uv lock --upgrade                  # Update all to latest compatible
+uv lock --upgrade-package fastapi  # Update single package
+uv sync                            # Apply updates
+
+# Running
+uv run python script.py            # Run in project environment
+uv run pytest                      # Run tests
+uv self update                     # Update uv itself
+```
+
+### Common Workflows
+
+**Development setup (after clone):**
+```bash
+uv sync --dev
+source .venv/bin/activate          # Linux/Mac
+# .venv\Scripts\activate           # Windows
+```
+
+**Adding a new dependency:**
+```bash
+uv add requests
+git add pyproject.toml uv.lock
+git commit -m "chore: add requests dependency"
+```
+
+**Production deployment:**
+```bash
+uv sync --no-dev --frozen
+```
+
+**CI/CD (GitHub Actions):**
+```yaml
+- name: Install uv
+  uses: astral-sh/setup-uv@v1
+
+- name: Install dependencies
+  run: uv sync --frozen
+
+- name: Run tests
+  run: uv run pytest
+```
+
+### Why uv
+
+| Feature | uv | pip |
+|---------|----|----|
+| Speed | 10–100x faster | Baseline |
+| Lock files | `uv.lock` (automatic) | None |
+| Add dependencies | `uv add` (updates lock automatically) | Manual edit |
+| pyproject.toml | Native | Limited |
+| Virtual envs | Auto-managed | Manual |
+
+**Always commit both `pyproject.toml` and `uv.lock`** — the lock file ensures every environment (dev, CI, prod, Docker) installs identical package versions.
+
+---
+
 ## Additional Resources
 
 - [PEP 8 — Style Guide for Python Code](https://peps.python.org/pep-0008/)
@@ -765,3 +1034,5 @@ class OrderProcessor:
 - [asyncio — Python Docs](https://docs.python.org/3/library/asyncio.html)
 - [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - [Semantic Versioning](https://semver.org/)
+- [uv Documentation](https://docs.astral.sh/uv/)
+- [Docker Documentation](https://docs.docker.com/)
