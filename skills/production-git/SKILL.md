@@ -1,6 +1,6 @@
 ---
 name: production-git
-description: Git branching strategy, commit conventions, PR workflow, release management, hotfix procedures, rollback, and tagging for production software projects. Use this skill when creating branches, writing commit messages, opening pull requests, preparing releases, handling production incidents, or reviewing git history and workflow. Triggers on any git-related task: branching, committing, merging, tagging, or deployment workflow.
+description: "Git branching strategy, commit conventions, PR workflow, release management, hotfix procedures, rollback, and tagging for production software projects. Use this skill when creating branches, writing commit messages, opening pull requests, preparing releases, handling production incidents, or reviewing git history and workflow. Triggers on any git-related task: branching, committing, merging, tagging, or deployment workflow."
 license: MIT
 metadata:
   author: nkartik94
