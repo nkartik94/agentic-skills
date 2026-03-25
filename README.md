@@ -13,10 +13,29 @@ npx skills add nkartik94/agentic-skills
 Or install a specific skill:
 
 ```bash
+# Python coding conventions
 npx skills add nkartik94/agentic-skills --skill production-python
+
+# Git workflow and branching strategy
+npx skills add nkartik94/agentic-skills --skill production-git
 ```
 
 Skills activate automatically when the agent detects a relevant task — no manual triggering needed.
+
+## Update
+
+Pull the latest changes for all installed skills:
+
+```bash
+npx skills update
+```
+
+Or update a specific skill:
+
+```bash
+npx skills update --skill production-python
+npx skills update --skill production-git
+```
 
 ## Available Skills
 
