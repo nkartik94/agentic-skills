@@ -277,7 +277,7 @@ def run_pipeline(job_id: int, file_path: str) -> Dict:
 
 **Output:**
 ```
-CANONICAL {"event": "pipeline.run", "job_id": 42, "file": "sov.xlsx",
+CANONICAL {"event": "pipeline.run", "job_id": 42, "file": "input.xlsx",
   "status": "success", "rows_extracted": 120, "tokens_in": 15000,
   "tokens_out": 3200, "duration_ms": 8240}
 ```

@@ -3,7 +3,7 @@ name: production-python
 description: Production-grade Python coding conventions for modules, classes, functions, Pydantic models, SQLAlchemy models, and tests. Use this skill when writing new Python files, modifying existing Python code, creating data models, setting up project structure, or reviewing Python code for best practices. Triggers on any task involving Python source files (.py), test files, notebooks, or project scaffolding.
 license: MIT
 metadata:
-  author: algoleap
+  author: nkartik94
   version: "1.1.0"
 ---
 
